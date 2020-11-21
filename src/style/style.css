@@ -1,0 +1,86 @@
+body{
+    background-color: #f0f0f0;
+}
+.overview-container{
+    width: 1200px;
+    height: 130px;
+    margin: 20px;
+    border-radius: 10px;
+    background-color: #ffffff;
+}
+
+.svg-container{
+    position: absolute;
+    top: 150px;
+    /* left: 0; */
+    width: 1200px;
+    height: 540px;
+    margin: 20px;
+    border-radius: 10px;
+    background-color: #ffffff;
+}
+
+svg{
+    /* background-color: #fff; */
+}
+
+#root{
+    height: 100vh;
+    widows: 100vw;
+}
+
+.links line {
+    /* fill: #aaa; */
+    /* stroke: #aaa; */
+    stroke-width: 1.5px;
+    stroke: rgb(192, 189, 189)
+  }
+  
+  .nodes rect {
+    pointer-events: all;
+    stroke: none;
+    stroke-width: 40px;
+    fill: #d4dbff;
+  }
+
+  .nodes circle {
+    pointer-events: all;
+    fill: #000;
+  }
+
+  #tooltip {
+    position: absolute;
+    /* width: 100px;
+    height: 100px; */
+    /* left: 50px; */
+    /* bottom: 50px; */
+    padding: 10px;
+    font: 12px sans-serif;
+    background: lightsteelblue;
+    border: 10px;
+    border-radius: 8px;
+    pointer-events: none;
+    text-align: left;
+    line-height: 1.5em;
+    font-weight: bold;
+    z-index:999;
+}
+
+.nodes text{
+    font-size: 1em;
+    fill: #1d2024;
+    z-index: 999;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  .overview .inner{
+    fill: #fff;
+  }
+
+  .overview .outer{
+    /* fill: pink; */
+  }
+
+  .overview line{
+      stroke-width: 4px;
+  }
