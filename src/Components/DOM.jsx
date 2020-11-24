@@ -42,9 +42,12 @@ class DOM extends Component {
 
   drawOvVw(clusterByKey){
 
+    // console.log(clusterByKey);
+
     let keys = Object.keys(clusterByKey),
     values = Object.values(clusterByKey),
-    entries = Object.entries(clusterByKey)
+    entries = Object.entries(clusterByKey),
+    _this = this
 
     var svg = d3.select("#svg-overview").attr("width", 1200).attr("height", 130);
 
@@ -157,18 +160,37 @@ class DOM extends Component {
         return color
     })
 
-    node.append('circle')
+    let outer = node.append('circle')
     .attr('class','outer')
     .attr('r',radius)
     .attr('fill',function(d){
         /* 根据cluster中是否包含diff不为0来确定node的颜色 */
         return d[1].links.some(value=>{return value.diff != 0})?'#dc3545':'green'
     })
+    .on('click',function(d){
+      _this.drawRv(clusterByKey[d[0]])
+    })
+  
 
     node.append('circle')
     .attr('class','inner')
     .attr('r',innerRadius)
-    .each(function(d){console.log(d);})
+    // .each(function(d){console.log(d);})
+    .on('click',function(d){
+      _this.drawRv(clusterByKey[d[0]])
+    })
+    .on('mouseover',function(){
+      d3.select(this)
+      .transition()
+      .duration(200)
+      .attr('r',innerRadius+1.5)
+    })
+    .on('mouseout',function(){
+      d3.select(this)
+      .transition()
+      .duration(200)
+      .attr('r',innerRadius)
+    })
 
     node.append('text')
     .text(function(d){return d[0]})
@@ -205,14 +227,20 @@ class DOM extends Component {
     paddingBottom = 20,
     overviewHieght = 130
 
-    let nodes = [], links = []
-    Object.values(clusterByKey).forEach(d=>{
-        nodes = [...nodes, ...d.nodes]
-    })
 
-    Object.values(clusterByKey).forEach(d=>{
-        links = [...links, ...d.links]
-    })
+    let nodes = [], links = []
+    if(! ('id' in clusterByKey)){
+        Object.values(clusterByKey).forEach(d=>{
+          nodes = [...nodes, ...d.nodes]
+      })
+
+      Object.values(clusterByKey).forEach(d=>{
+          links = [...links, ...d.links]
+      })  
+    }else{
+      nodes = clusterByKey.nodes
+      links = clusterByKey.links
+    }
 
     /* HEREEEEEEEEEEEEEEEEEEEEEEEEEEE */
 
@@ -232,6 +260,7 @@ class DOM extends Component {
 
   var svg = d3.select("#svg-rv").attr("width", width).attr("height", height);
 
+  svg.selectAll("*").remove();
 
 
   let div = d3.select('body')

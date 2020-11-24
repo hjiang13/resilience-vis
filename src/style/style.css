@@ -79,8 +79,19 @@ svg{
 
   .overview .outer{
     /* fill: pink; */
+    hover:pointer;
   }
 
   .overview line{
       stroke-width: 4px;
+  }
+
+  .inner:hover{
+    cursor: pointer;
+    /* fill: #064806; */
+  }
+
+  .outer:hover{
+    cursor: pointer;
+    /* fill: #064806; */
   }
