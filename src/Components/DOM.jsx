@@ -12,7 +12,22 @@ class DOM extends Component {
       clusterByKey:{},
       goldenByKey:{},
       errByKey:{},
-      diffList_union:{}
+      diffList_union:{},
+
+
+      cluster:'',
+      click_flag:false,
+
+      /* 两种setting，分别是全局模式和local模式 */
+      global_setting:{
+        force:-20,
+        if_global: true
+      },
+
+      local_setting:{
+        force:-400,
+        if_global: false
+      },
     };
 
     this.heightHandle = this.heightHandle.bind(this);
@@ -131,6 +146,8 @@ class DOM extends Component {
                 "diffList_union": diffList_union
                 }
 
+    
+
 
     let node = svg
     .selectAll('g')
@@ -139,6 +156,7 @@ class DOM extends Component {
     .append('g')
     .attr('class','overview')
     .attr('transform',function(d,i){return `translate(${clusterNodePos(i,entries).x},${clusterNodePos(i,entries).y})`})
+    // .each(function(d){console.log(d);})
 
     node.append('line')
     .attr('x1',0)
@@ -168,7 +186,10 @@ class DOM extends Component {
         return d[1].links.some(value=>{return value.diff != 0})?'#dc3545':'green'
     })
     .on('click',function(d){
-      _this.drawRv(clusterByKey[d[0]])
+      _this.drawRv(clusterByKey[d[0]],_this.state.local_setting)
+      _this.setState({
+        cluster: d[1].label
+      })
     })
   
 
@@ -177,7 +198,10 @@ class DOM extends Component {
     .attr('r',innerRadius)
     // .each(function(d){console.log(d);})
     .on('click',function(d){
-      _this.drawRv(clusterByKey[d[0]])
+      _this.drawRv(clusterByKey[d[0]],_this.state.local_setting)
+      _this.setState({
+        cluster: d[1].label
+      })
     })
     .on('mouseover',function(){
       d3.select(this)
@@ -198,7 +222,11 @@ class DOM extends Component {
     .attr('dy', function(d,i){
         return i%2 == 0?radius+3*innerRadius:-radius-innerRadius
     })
-
+    
+    node.append('title')
+    .text(function(d){
+      return d[1].label
+    })
 
 
 }
@@ -206,9 +234,12 @@ class DOM extends Component {
 
 
 
-  drawRv(clusterByKey){
+  drawRv(clusterByKey,setting){
     global.data.clusterByKey = clusterByKey
 
+    /* parse setting */
+    let force = setting.force,
+    mode = setting.if_global
       
     const width = 1200,
     height = 600;
@@ -225,7 +256,11 @@ class DOM extends Component {
     paddingRight = 60,
     paddingTop = 20,
     paddingBottom = 20,
-    overviewHieght = 130
+    overviewHieght = 130,
+    radius_local = 20,
+
+    _this = this
+
 
 
     let nodes = [], links = []
@@ -241,6 +276,7 @@ class DOM extends Component {
       nodes = clusterByKey.nodes
       links = clusterByKey.links
     }
+
 
     /* HEREEEEEEEEEEEEEEEEEEEEEEEEEEE */
 
@@ -278,7 +314,7 @@ class DOM extends Component {
           return d.id;
         })
       )
-      .force("charge", d3.forceManyBody().strength(-20))
+      .force("charge", d3.forceManyBody().strength(force))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force(
         "r",
@@ -292,26 +328,41 @@ class DOM extends Component {
     /* 结束构造simulation*/
 
 
+    /* 映射线条粗细的比例尺 */
+    let scale = d3.scaleLinear().domain(d3.extent(links.map(d=>{return d.goldenValue}))).range([1.5,3])
 
 
+    let link_g = svg
+    .append('g')
+    .attr("class", "links")
+    .selectAll('g')
+    .data(links)
+    .enter()
+    .append('g')
 
 
-
-
-
+    let link, node, link_text
+      
+  /* 全局模式下隐藏id */
+  if(mode){
+    
     /* 开始画点和线 */
-    let link = svg
-      .append("g")
-      .attr("class", "links")
-      .selectAll("line")
-      .data(links)
-      .enter()
+    link = link_g
       .append("line")
       .style('stroke',function(d){
         return d.diff==0?"rgb(192, 189, 189)":'red'
       })
+      .style('stroke-width',function(d){
+        return scale(d.goldenValue)
+      })
 
-    let node = svg
+    link_text = link_g
+    .append('text')
+    .attr('style','link_text')
+    .text(function(d){return d.goldenValue;})
+    // .attr('dx','-10px')
+
+    node = svg
       .append("g")
       .attr("class", "nodes")
       .selectAll('g')
@@ -320,6 +371,8 @@ class DOM extends Component {
       .append('g')
       .on('mouseover',mouseover_circle)
       .on('mouseout',mouseout_circle)
+      .on('click',click_circle)
+      .on('dblclick',dblclick_circle)
       .call(
         d3
           .drag()
@@ -329,9 +382,7 @@ class DOM extends Component {
       );
 
 
-      
-      
-  let circle = node
+    let circle = node
       .append("rect")
       .attr("width", rectWidth)
       .attr('height', rectHeight)
@@ -343,10 +394,6 @@ class DOM extends Component {
       let hoverTrigger = node
       .append('circle')
       .attr('r',lightRadius)
-    //   .each(function(d){console.log(d);})
-      
-      // .append("circle")
-      // .attr("r", radius)
 
       let text = node
       .append('text')
@@ -358,19 +405,98 @@ class DOM extends Component {
       .style('display','none')
 
       
-
     /* arrow line */
     svg
-      .append("defs")
-      .append("marker")
-      .attr("id", "marker")
-      .attr("viewBox", "0 -5 10 5")
-      .attr("refX", 20)
-      .attr("markerWidth", 4)
-      .attr("markerHeight", 6)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M0,-5L10,0L0,5");
+    .append("defs")
+    .append("marker")
+    .attr("id", "marker")
+    .attr('width',100)
+    .attr('height',100)
+    .attr("viewBox", "0 -5 10 5")
+    .attr("refX", 15)
+    .attr("markerWidth", 4)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-5L10,0L0,5");
+  }
+  /* 局部模式下显示id */
+  else{
+    
+    /* 开始画点和线 */
+    link = link_g
+      .append("line")
+      .style('stroke',function(d){
+        return d.diff==0?"rgb(192, 189, 189)":'red'
+      })
+      .style('stroke-width',function(d){
+        return scale(d.goldenValue)
+      })
+
+
+    node = svg
+      .append("g")
+      .attr("class", "nodes")
+      .selectAll('g')
+      .data(nodes)
+      .enter()
+      .append('g')
+      .on('click',click_circle_local)
+      .on('dblclick',dblclick_circle_local)
+      .call(
+        d3
+          .drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended)
+      );
+
+
+    let circle = node
+      .append("circle")
+      .attr('class','circle_local')
+      .attr("r", radius_local)
+      // .attr('transform', function(){return `translate(${-rectWidth/2},${-rectHeight/2})`})
+
+      let text = node
+      .append('text')
+      .attr('class','text_local')
+      .attr('x',0)
+      .attr('y',0)
+      .attr('dx',-17)
+      .attr('dy',5)
+      .text(function(d){return `0x${d.id}`})
+
+      
+    /* arrow line */
+    svg
+    .append("defs")
+    .append("marker")
+    .attr("id", "marker")
+    .attr("viewBox", "0 -5 10 5")
+    .attr("refX", radius_local*2)
+    .attr("markerWidth", 4)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-5L10,0L0,5");
+
+    
+    link_text = link_g
+    .append('text')
+    .attr('style','link_text')
+    .text(function(d){return d.goldenValue;})
+    // .attr('dx','-20px')
+    .attr('dy','-3px')
+    .style('font-size','1em')
+    .style('z-index','999')
+     
+  }
+
+      
+
+      
+
 
     simulation.nodes(nodes).on("tick", function () {
       link
@@ -388,10 +514,13 @@ class DOM extends Component {
         })
         .attr("marker-end", "url(#marker)");
 
-      // link.attr('d',function(d){
-      //     return `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y} Z`
-      // })
-      // .attr("marker-end", "url(#marker)")
+        link_text
+        .attr('x',function(d){
+          return (d.source.x+d.target.x)/2
+        })
+        .attr('y',function(d){
+          return (d.source.y+d.target.y)/2
+        })
 
       node
       //   .attr("cx", function (d) {
@@ -450,40 +579,104 @@ class DOM extends Component {
       .attr('height', rectHeightHover)
 
       
-      let [gX,gY] = d3.select(this).attr('transform').match(/(\d+\.?\d+)/g)
-
-      d3.select('#tooltip')
-          .transition()
-          .delay(500)
-          .style('opacity', 0.9);
-      d3.select('#tooltip')
-          .html(`<font color="#6610f2">_gvid:</font> ${d._gvid}</br><font color="#6610f2">id:</font>${d.id}</br><font color="#6610f2">label:</font> ${d.label}</br><font color="#6610f2">index:</font> ${d.index}`)
-          .style('left', `${Number(gX)-radius+20}px`)
-          .style("top", `${Number(gY)+rectHeightHover+paddingTop*2+overviewHieght}px`);
           
 
   }
 
   function mouseout_circle(d,i){
-      let _this = this.parentNode;
 
-      d3.select(this)
-      .select('text')
-      .transition()
-      .duration(50)
-      .style('display','none')
+    
 
-      d3.select(this)
-      .select('rect')
-      .transition()
-      .duration(100)
-      .attr('width', rectWidth)
-      .attr('height', rectHeight)
+      if(!_this.state.click_flag){
+        d3.select(this)
+        .select('text')
+        .transition()
+        .duration(50)
+        .style('display','none')
+  
+        d3.select(this)
+        .select('rect')
+        .transition()
+        .duration(100)
+        .attr('width', rectWidth)
+        .attr('height', rectHeight)
+
+      }
       
-      d3.select('#tooltip')
-      .transition()
-      .duration(300)
-      .style('opacity', 0);
+   
+  }
+
+  function click_circle(d){
+    _this.setState({click_flag:true})
+
+    d3.select(this)
+    .select('text')
+    .transition()
+    .duration(50)
+    .style('display','block')
+
+    d3.select(this)
+    .select('rect')
+    .transition()
+    .duration(100)
+    .attr('width', rectWidthHover)
+    .attr('height', rectHeightHover)
+
+    let [gX,gY] = d3.select(this).attr('transform').match(/(\d+\.?\d+)/g)
+
+    d3.select('#tooltip')
+        .transition()
+        .delay(50)
+        .style('opacity', 0.9);
+    d3.select('#tooltip')
+        .html(`<font color="#6610f2">_gvid:</font> ${d._gvid}</br><font color="#6610f2">id:</font>0x${d.id}</br><font color="#6610f2">label:</font> ${d.label}</br><font color="#6610f2">index:</font> ${d.index}`)
+        .style('left', `${Number(gX)-radius+20}px`)
+        .style("top", `${Number(gY)+rectHeightHover+paddingTop*2+overviewHieght}px`);
+  }
+
+  function dblclick_circle(d){
+
+    _this.setState({click_flag:false})
+
+
+    d3.select(this)
+    .select('text')
+    .transition()
+    .duration(50)
+    .style('display','none')
+
+    d3.select(this)
+    .select('rect')
+    .transition()
+    .duration(100)
+    .attr('width', rectWidth)
+    .attr('height', rectHeight)
+
+    d3.select('#tooltip')
+    .transition()
+    .duration(50)
+    .style('opacity', 0);
+  }
+
+  function click_circle_local(d){
+    
+    let [gX,gY] = d3.select(this).attr('transform').match(/(\d+\.?\d+)/g)
+
+    d3.select('#tooltip')
+        .transition()
+        .delay(50)
+        .style('opacity', 0.9);
+    d3.select('#tooltip')
+        .html(`<font color="#6610f2">_gvid:</font> ${d._gvid}</br><font color="#6610f2">id:</font>0x${d.id}</br><font color="#6610f2">label:</font> ${d.label}</br><font color="#6610f2">index:</font> ${d.index}`)
+        .style('left', `${Number(gX)-radius+20}px`)
+        .style("top", `${Number(gY)+rectHeightHover+paddingTop*2+overviewHieght}px`);
+  }
+
+  function dblclick_circle_local(d){
+    d3.select('#tooltip')
+    .transition()
+    .duration(50)
+    .style('opacity', 0);
   }
   }
 
@@ -646,9 +839,10 @@ initJson_parseLayout(input){
                     "source":d.tail,
                     "target":d.head,
                     'color':d.color || undefined,
-                    "index":undefined
+                    "index":d.index
                 }
             })
+
     
     
     
@@ -681,6 +875,7 @@ initJson_parseLayout(input){
                 clusterByKey[clusterKey].label = clusterArr[i].label;
                 clusterByKey[clusterKey].color = clusterArr[i].color;
             }
+
     
             
             /* 最终数组 */
@@ -690,7 +885,7 @@ initJson_parseLayout(input){
             this.drawOvVw(clusterByKey)
       
             /* 引入drawRv画下面的视图 */
-            this.drawRv(clusterByKey)
+            this.drawRv(clusterByKey,this.state.global_setting)
             
     })
     
@@ -714,7 +909,8 @@ initJson_parseLayout(input){
               <svg id="svg-overview"></svg>
           </div>
         <div className="svg-container">
-          <svg id="svg-rv"></svg>
+              <svg id="svg-rv"></svg>
+              <h3>{this.state.cluster}</h3>
         </div>
       </div>
     );
