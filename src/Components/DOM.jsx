@@ -20,13 +20,14 @@ class DOM extends Component {
 
       /* 两种setting，分别是全局模式和local模式 */
       global_setting:{
+        if_global: true,
         force:-20,
-        if_global: true
+        only_filter: false,
       },
 
       local_setting:{
+        if_global: false,
         force:-400,
-        if_global: false
       },
     };
 
@@ -35,6 +36,9 @@ class DOM extends Component {
     this.initJson_parseLayout = this.initJson_parseLayout.bind(this);
     this.drawOvVw = this.drawOvVw.bind(this)
     this.drawRv = this.drawRv.bind(this)
+    this.globalHandle = this.globalHandle.bind(this)
+    this.filterHandle = this.filterHandle.bind(this)
+    this.init_legend = this.init_legend.bind(this)
     
   }
 
@@ -53,9 +57,52 @@ class DOM extends Component {
   }
 
 
+  init_legend(svg){
+    
+  let lengendArr = {
+    group:[
+      'head','tail','body'
+    ],
+    style:[
+      '#ffc107','#e83e8c','#d4dbff'
+    ]
+  }
+
+
+
+  let legend = svg
+  .append('g')
+  .attr('transform',function(){return `translate(60,60)`})
+  .attr('class','lengend')
+  .selectAll('g')
+  .data(lengendArr.style.map((d,i)=>{
+    return {
+      style:d,
+      name:lengendArr.group[i]
+    }
+  }))
+  .enter()
+  .append('g')
+  .attr('transform',function(d,i){return `translate(0,${40*i})`})
+  
+  legend
+  .append('circle')
+  .attr('r',10)
+  .attr('fill',function(d){return d.style})
+
+  legend
+  .append('text')
+  .text(function(d){return d.name})
+  .attr('dx',30)
+  .attr('dy',5)
+
+  }
 
 
   drawOvVw(clusterByKey){
+
+    /* 切换global和local模式靠的是数据改变 ，样式渲染变化靠的是内部的一个判断if(mode){}*/
+    /* 切换global和filter模式靠的是数据的改变 */
 
     // console.log(clusterByKey);
 
@@ -156,7 +203,6 @@ class DOM extends Component {
     .append('g')
     .attr('class','overview')
     .attr('transform',function(d,i){return `translate(${clusterNodePos(i,entries).x},${clusterNodePos(i,entries).y})`})
-    // .each(function(d){console.log(d);})
 
     node.append('line')
     .attr('x1',0)
@@ -196,7 +242,6 @@ class DOM extends Component {
     node.append('circle')
     .attr('class','inner')
     .attr('r',innerRadius)
-    // .each(function(d){console.log(d);})
     .on('click',function(d){
       _this.drawRv(clusterByKey[d[0]],_this.state.local_setting)
       _this.setState({
@@ -229,9 +274,48 @@ class DOM extends Component {
     })
 
 
+    // this.init_legend(svg)
+ 
+
 }
 
+  globalHandle(){
+    /* 点击再渲染，这样可以不用牵扯到js的异步读取 */
+    /* 下面的clg可行 */
+    // console.log(this.state.clusterByKey);
 
+    /* 更新filter的状态，然后传入渲染函数 */
+    let update_onlyFilter = false
+    this.setState({
+      global_setting:{
+        force:-20,
+        if_global: true,
+        only_filter: update_onlyFilter
+      },
+    })
+    this.drawRv(this.state.clusterByKey,this.state.global_setting)
+    
+    this.setState({
+      cluster:''
+    })
+  }
+
+  filterHandle(){
+    /* 更新filter的状态，然后传入渲染函数 */
+    let update_onlyFilter = true
+    this.setState({
+      global_setting:{
+        force:-20,
+        if_global: true,
+        only_filter: update_onlyFilter
+      },
+    })
+    this.drawRv(this.state.clusterByKey,this.state.global_setting)
+    
+    this.setState({
+      cluster:''
+    })
+  }
 
 
   drawRv(clusterByKey,setting){
@@ -262,19 +346,46 @@ class DOM extends Component {
     _this = this
 
 
-
+/* 根据only_filter的值来决定数组nodes和links */
     let nodes = [], links = []
-    if(! ('id' in clusterByKey)){
+
+    if(!this.state.global_setting.only_filter){
+      if(! ('id' in clusterByKey)){
         Object.values(clusterByKey).forEach(d=>{
           nodes = [...nodes, ...d.nodes]
       })
 
       Object.values(clusterByKey).forEach(d=>{
           links = [...links, ...d.links]
-      })  
+        })  
+      }else{
+        nodes = clusterByKey.nodes
+        links = clusterByKey.links
+      }
     }else{
-      nodes = clusterByKey.nodes
-      links = clusterByKey.links
+    /* 下面构造filter下的数组 */    
+      if(! ('id' in clusterByKey)){
+        Object.values(clusterByKey).forEach(d=>{
+          let res = d.links.some((val,index)=>{
+            return val.diff != 0
+          })
+          if(res){
+            nodes = [...nodes, ...d.nodes]
+          }
+      })
+  
+        Object.values(clusterByKey).forEach(d=>{
+          let res = d.links.some((val,index)=>{
+            return val.diff != 0
+          })
+          if(res){
+            links = [...links, ...d.links]
+          }
+        })  
+      }else{
+        nodes = clusterByKey.nodes
+        links = clusterByKey.links
+      }
     }
 
 
@@ -297,6 +408,8 @@ class DOM extends Component {
   var svg = d3.select("#svg-rv").attr("width", width).attr("height", height);
 
   svg.selectAll("*").remove();
+  
+this.init_legend(svg)
 
 
   let div = d3.select('body')
@@ -382,6 +495,7 @@ class DOM extends Component {
       );
 
 
+
     let circle = node
       .append("rect")
       .attr("width", rectWidth)
@@ -389,10 +503,14 @@ class DOM extends Component {
       .attr('rx', rx)
       .attr('ry', ry)
       .attr('transform', function(){return `translate(${-rectWidth/2},${-rectHeight/2})`})
+      .attr('fill', function(d){
+        return d.position == 'head'?'orange':(d.position == 'tail'?'pink':'#d4dbff')
+      })
 
       
       let hoverTrigger = node
       .append('circle')
+      .attr('class','circle')
       .attr('r',lightRadius)
 
       let text = node
@@ -456,6 +574,9 @@ class DOM extends Component {
       .append("circle")
       .attr('class','circle_local')
       .attr("r", radius_local)
+      .attr('fill', function(d){
+        return d.position == 'head'?'orange':(d.position == 'tail'?'pink':'#d4dbff')
+      })
       // .attr('transform', function(){return `translate(${-rectWidth/2},${-rectHeight/2})`})
 
       let text = node
@@ -535,7 +656,6 @@ class DOM extends Component {
     });
 
     simulation.force("link").links(links);
-
 
 
 
@@ -845,14 +965,30 @@ initJson_parseLayout(input){
 
     
     
-    
+    // console.log(clusterArr);
+    // console.log(nodesByKey);
             for(let i = 0;i<clusterArr.length;i++){
                 clusterKey = clusterArr[i].id
                 clusterByKey[clusterKey] = {};
                 clusterByKey[clusterKey].nodes = [];
                 clusterByKey[clusterKey].links = [];
-                clusterArr[i].nodes.forEach(d=>{
-                    clusterByKey[clusterKey].nodes.push(nodesByKey[d])
+                clusterArr[i].nodes.forEach((d,j)=>{
+                  let position;
+                  if(j==0){
+                    position = 'head'
+                  }else if(j==clusterArr[i].nodes.length-1){
+                    position = 'tail'
+                  }else{
+                    position = 'body'
+                  }
+                    clusterByKey[clusterKey].nodes.push({
+                      _gvid:nodesByKey[d]._gvid,
+                      id:nodesByKey[d].id,
+                      label:nodesByKey[d].label,
+                      shape:nodesByKey[d].shape,
+                      _gvid:nodesByKey[d]._gvid,
+                      position: position
+                    })
                 })
                 if(clusterArr[i].edges){
                     clusterArr[i].edges.forEach(d=>{
@@ -880,12 +1016,15 @@ initJson_parseLayout(input){
             
             /* 最终数组 */
             // json(clusterByKey)
+            this.setState({
+              clusterByKey: clusterByKey
+            })
 
             /* 引入drawOverview画上面的视图 */
             this.drawOvVw(clusterByKey)
       
             /* 引入drawRv画下面的视图 */
-            this.drawRv(clusterByKey,this.state.global_setting)
+            // this.drawRv(clusterByKey,this.state.global_setting)
             
     })
     
@@ -912,6 +1051,8 @@ initJson_parseLayout(input){
               <svg id="svg-rv"></svg>
               <h3>{this.state.cluster}</h3>
         </div>
+        <button type="button" onClick={this.globalHandle} className="btn btn-outline-primary">Global View</button>
+        <button type="button" onClick={this.filterHandle} className="btn btn-outline-primary">Filter</button>
       </div>
     );
   }
