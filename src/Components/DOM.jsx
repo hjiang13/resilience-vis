@@ -21,7 +21,7 @@ class DOM extends Component {
       /* 两种setting，分别是全局模式和local模式 */
       global_setting:{
         if_global: true,
-        force:-20,
+        force:-5,
         only_filter: false,
       },
 
@@ -857,6 +857,9 @@ this.init_legend(svg)
       this.setState({
           goldenByKey: goldenByKey
       })
+
+      global.goldenByKey = goldenByKey
+
     })
 
     axios.get("../../statics/LSG_153.txt")
@@ -905,6 +908,7 @@ this.init_legend(svg)
         errByKey: errByKey
     })
     })
+
   
  
 //   return {
@@ -922,7 +926,7 @@ this.init_legend(svg)
  */  
 initJson_parseLayout(input){
 
-    axios.get('../../statics/bsort.json')
+    axios.get('../../statics/CoMD.json')
     .then(json=>{
         json = json.data;
         let clusterArr = [], nodesByKey = {}, edgesByKey = {}
@@ -963,6 +967,9 @@ initJson_parseLayout(input){
                 }
             })
 
+            global.clusterArr = clusterArr
+            global.nodesByKey = nodesByKey
+            global.edgesByKey = edgesByKey
     
     
     // console.log(clusterArr);
@@ -1000,9 +1007,15 @@ initJson_parseLayout(input){
                             "target": nodesByKey[edgesByKey[d].target].id,
                             "color": edgesByKey[d].color,
                             "index": edgesByKey[d].index,
-                            "goldenValue": goldenByKey[`${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}`].value,
-                            "errValue": errByKey[`${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}`].value,
-                            "diff": Math.abs(errByKey[`${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}`].value - goldenByKey[`${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}`].value),
+                            "goldenValue": 
+                                `${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}` in goldenByKey?
+                                  goldenByKey[`${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}`].value : undefined,
+                            "errValue": 
+                            `${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}` in errByKey?
+                                  errByKey[`${nodesByKey  [edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}`].value : undefined,
+                            "diff": 
+                              `${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}` in goldenByKey?
+                                  Math.abs(errByKey[`${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}`].value - goldenByKey[`${nodesByKey[edgesByKey[d].source].id}to${nodesByKey[edgesByKey[d].target].id}`].value) : undefined,
                             "_gvid": edgesByKey[d]._gvid
                         })
                     })
@@ -1013,7 +1026,8 @@ initJson_parseLayout(input){
             }
 
     
-            
+            global.clusterByKey = clusterByKey
+
             /* 最终数组 */
             // json(clusterByKey)
             this.setState({
