@@ -13,6 +13,7 @@ class DOM extends Component {
       goldenByKey:{},
       errByKey:{},
       diffList_union:{},
+      clusterArr:[],
 
 
       cluster:'',
@@ -39,6 +40,8 @@ class DOM extends Component {
     this.globalHandle = this.globalHandle.bind(this)
     this.filterHandle = this.filterHandle.bind(this)
     this.init_legend = this.init_legend.bind(this)
+    this.clickLabel = this.clickLabel.bind(this)
+    
     
   }
 
@@ -72,7 +75,7 @@ class DOM extends Component {
 
   let legend = svg
   .append('g')
-  .attr('transform',function(){return `translate(60,60)`})
+  .attr('transform',function(){return `translate(60,90)`})
   .attr('class','lengend')
   .selectAll('g')
   .data(lengendArr.style.map((d,i)=>{
@@ -83,7 +86,7 @@ class DOM extends Component {
   }))
   .enter()
   .append('g')
-  .attr('transform',function(d,i){return `translate(0,${40*i})`})
+  .attr('transform',function(d,i){return `translate(0,${30*i})`})
   
   legend
   .append('circle')
@@ -800,6 +803,16 @@ this.init_legend(svg)
   }
   }
 
+
+  clickLabel(d){
+    // console.log(this.state.clusterByKey);
+    // console.log(this.state.clusterByKey[d.id]);
+    this.drawRv(this.state.clusterByKey[d.id],this.state.local_setting)
+      this.setState({
+        cluster: d.label
+      })
+  }
+
   /* 
   return {
       "goldenByKey": goldenByKey,
@@ -926,7 +939,7 @@ this.init_legend(svg)
  */  
 initJson_parseLayout(input){
 
-    axios.get('../../statics/CoMD.json')
+    axios.get('../../statics/bsort.json')
     .then(json=>{
         json = json.data;
         let clusterArr = [], nodesByKey = {}, edgesByKey = {}
@@ -970,6 +983,10 @@ initJson_parseLayout(input){
             global.clusterArr = clusterArr
             global.nodesByKey = nodesByKey
             global.edgesByKey = edgesByKey
+
+            this.setState({
+              clusterArr:clusterArr
+            })
     
     
     // console.log(clusterArr);
@@ -1056,6 +1073,10 @@ initJson_parseLayout(input){
   }
 
   render() {
+
+    let itemCardColor = ["#d54062", "#ffa36c", "#ebdc87", "#799351", "#557571", "#d49a89", "#a3d2ca", "#5eaaa8", "#056676", "#d8d3cd"]
+
+
     return (
       <div id="root">
           <div className='overview-container'>
@@ -1067,6 +1088,22 @@ initJson_parseLayout(input){
         </div>
         <button type="button" onClick={this.globalHandle} className="btn btn-outline-primary">Global View</button>
         <button type="button" onClick={this.filterHandle} className="btn btn-outline-primary">Filter</button>
+
+        <div id='item-coat'>
+            <div id="item" className='d-flex flex-column justify-content-between'>
+                <div id="item-filtered" className="flex-grow-1">
+                    <span className="title">Cluster: Number {this.state.clusterArr.length}</span>
+                    {this.state.clusterArr.map((d,i)=>{
+                        return <div style={{backgroundColor:itemCardColor[i%10]}} 
+                          className="item-card rounded alert-info" 
+                          key={i}
+                          onClick={this.clickLabel.bind(this,d)}
+                          >{d.label}</div>
+                    })}
+                    {/* <div style={{backgroundColor:itemCardColor[1]}} className="item-card rounded alert-info" >123</div> */}
+                </div>
+            </div>
+        </div>
       </div>
     );
   }
