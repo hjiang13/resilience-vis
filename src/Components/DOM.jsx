@@ -2,7 +2,9 @@ import React, { Component } from "react";
 import * as d3 from "d3";
 import "guans-style";
 import "../style/style.css";
-import axios from 'axios'
+import axios from 'axios';
+import * as dat from 'dat.gui';
+
 
 class DOM extends Component {
   constructor(props) {
@@ -18,6 +20,8 @@ class DOM extends Component {
 
       cluster:'',
       click_flag:false,
+      threshold: 0,
+      clusterId:'',
 
       /* 两种setting，分别是全局模式和local模式 */
       global_setting:{
@@ -30,6 +34,14 @@ class DOM extends Component {
         if_global: false,
         force:-400,
       },
+
+      /* injection node */
+      /* 在这里修改注入错误的节点 */
+      injectNode : {
+        _gvid: undefined,
+        id:'0x400667',
+        cluster: 'cluster_12'
+      }
     };
 
     this.heightHandle = this.heightHandle.bind(this);
@@ -41,6 +53,8 @@ class DOM extends Component {
     this.filterHandle = this.filterHandle.bind(this)
     this.init_legend = this.init_legend.bind(this)
     this.clickLabel = this.clickLabel.bind(this)
+    this.initGUI = this.initGUI.bind(this)
+    
     
     
   }
@@ -117,12 +131,12 @@ class DOM extends Component {
     var svg = d3.select("#svg-overview").attr("width", 1200).attr("height", 130);
 
     let width = 1200,
-    height = 130,
-    paddingLeft = 60, 
-    paddingRight = 60,
-    paddingTop = 20,
-    paddingBottom = 20,
-    innerRadius = 7,
+    height = 80,
+    paddingLeft = 40, 
+    paddingRight = 40,
+    paddingTop = 30,
+    paddingBottom = 30,
+    innerRadius = 4,
     radius = 15,
     intervel = (width-paddingLeft-paddingRight-2*radius)/(entries.length-1)
 
@@ -227,24 +241,30 @@ class DOM extends Component {
         return color
     })
 
-    let outer = node.append('circle')
-    .attr('class','outer')
-    .attr('r',radius)
-    .attr('fill',function(d){
-        /* 根据cluster中是否包含diff不为0来确定node的颜色 */
-        return d[1].links.some(value=>{return value.diff != 0})?'#dc3545':'green'
-    })
-    .on('click',function(d){
-      _this.drawRv(clusterByKey[d[0]],_this.state.local_setting)
-      _this.setState({
-        cluster: d[1].label
-      })
-    })
+    // let outer = node.append('circle')
+    // .attr('class','outer')
+    // .attr('r',radius)
+    // .attr('fill',function(d){
+    //     /* 根据cluster中是否包含diff不为0来确定node的颜色 */
+    //     return d[1].links.some(value=>{return value.diff != 0})?'#dc3545':'green'
+    // })
+    // .on('click',function(d){
+    //   _this.drawRv(clusterByKey[d[0]],_this.state.local_setting)
+    //   _this.setState({
+    //     cluster: d[1].label
+    //   })
+    // })
   
+
+
 
     node.append('circle')
     .attr('class','inner')
     .attr('r',innerRadius)
+    .attr('fill',function(d){
+        /* 根据cluster中是否包含diff不为0来确定node的颜色 */
+        return d[1].links.some(value=>{return value.diff != 0})?'#dc3545':'green'
+    })
     .on('click',function(d){
       _this.drawRv(clusterByKey[d[0]],_this.state.local_setting)
       _this.setState({
@@ -264,11 +284,40 @@ class DOM extends Component {
       .attr('r',innerRadius)
     })
 
-    node.append('text')
-    .text(function(d){return d[0]})
-    .attr('dx', -intervel/2)
+    node
+    .append('path')
+    .attr('d',function(d){
+      return (
+        `M 0 -10  L 5 -20 L -5 -20 Z`
+      )
+    })
+    .attr('stroke','purple')
+    .attr('fill','purple')
+    // .text(function(d){return 'inject'})
+    // .attr('dx', -intervel/2)
     .attr('dy', function(d,i){
         return i%2 == 0?radius+3*innerRadius:-radius-innerRadius
+    })
+    .style('display',function(d){
+      return d[0]==_this.state.injectNode.cluster?'display':'none'
+    })
+
+    node
+    .append('path')
+    .attr('d',function(d){
+      return (
+        `M 0 10  L 5 20 L -5 20 Z`
+      )
+    })
+    .attr('stroke','purple')
+    .attr('fill','purple')
+    // .text(function(d){return 'inject'})
+    // .attr('dx', -intervel/2)
+    .attr('dy', function(d,i){
+        return i%2 == 0?radius+3*innerRadius:-radius-innerRadius
+    })
+    .style('display',function(d){
+      return d[0]==_this.state.injectNode.cluster?'display':'none'
     })
     
     node.append('title')
@@ -328,8 +377,8 @@ class DOM extends Component {
     let force = setting.force,
     mode = setting.if_global
       
-    const width = 1200,
-    height = 600;
+    const width = 900,
+    height = 840;
 
     const radius = 6,
     rectWidth = 12,
@@ -466,7 +515,7 @@ this.init_legend(svg)
     link = link_g
       .append("line")
       .style('stroke',function(d){
-        return d.diff==0?"rgb(192, 189, 189)":'red'
+        return d.diff<=_this.state.threshold?"rgb(192, 189, 189)":'red'
       })
       .style('stroke-width',function(d){
         return scale(d.goldenValue)
@@ -475,7 +524,7 @@ this.init_legend(svg)
     link_text = link_g
     .append('text')
     .attr('style','link_text')
-    .text(function(d){return d.goldenValue;})
+    .text(function(d){return d.diff;})
     // .attr('dx','-10px')
 
     node = svg
@@ -548,7 +597,7 @@ this.init_legend(svg)
     link = link_g
       .append("line")
       .style('stroke',function(d){
-        return d.diff==0?"rgb(192, 189, 189)":'red'
+        return d.diff<=_this.state.threshold?"rgb(192, 189, 189)":'red'
       })
       .style('stroke-width',function(d){
         return scale(d.goldenValue)
@@ -570,7 +619,8 @@ this.init_legend(svg)
           .on("start", dragstarted)
           .on("drag", dragged)
           .on("end", dragended)
-      );
+      )
+      // .each(function(d){console.log(d);})
 
 
     let circle = node
@@ -578,8 +628,9 @@ this.init_legend(svg)
       .attr('class','circle_local')
       .attr("r", radius_local)
       .attr('fill', function(d){
-        return d.position == 'head'?'orange':(d.position == 'tail'?'pink':'#d4dbff')
+        return  `0x${d.id}`===_this.state.injectNode.id?'purple':(d.position == 'head'?'orange':(d.position == 'tail'?'pink':'#d4dbff'))
       })
+      
       // .attr('transform', function(){return `translate(${-rectWidth/2},${-rectHeight/2})`})
 
       let text = node
@@ -609,7 +660,7 @@ this.init_legend(svg)
     link_text = link_g
     .append('text')
     .attr('style','link_text')
-    .text(function(d){return d.goldenValue;})
+    .text(function(d){return d.diff;})
     // .attr('dx','-20px')
     .attr('dy','-3px')
     .style('font-size','1em')
@@ -617,7 +668,6 @@ this.init_legend(svg)
      
   }
 
-      
 
       
 
@@ -809,7 +859,8 @@ this.init_legend(svg)
     // console.log(this.state.clusterByKey[d.id]);
     this.drawRv(this.state.clusterByKey[d.id],this.state.local_setting)
       this.setState({
-        cluster: d.label
+        cluster: d.label,
+        clusterId: d.id
       })
   }
 
@@ -1045,6 +1096,7 @@ initJson_parseLayout(input){
     
             global.clusterByKey = clusterByKey
 
+
             /* 最终数组 */
             // json(clusterByKey)
             this.setState({
@@ -1061,13 +1113,32 @@ initJson_parseLayout(input){
     
   }
 
+initGUI(){
+  
+        //定义gui配置项
+        const controls = new function(){
+          this.threshold = 0
+      }
 
+      const gui = new dat.GUI();
+
+
+      /* 在这里修改thrshold的range */
+      /* 0, 100 */
+      gui.add(controls, 'threshold', 0, 100).name('Diff Threshold').step(1).onFinishChange(threshold=>{
+        this.setState({
+          threshold : threshold
+        })
+        this.drawRv(this.state.clusterByKey[this.state.clusterId],this.state.local_setting)    })
+}
   
 
   componentDidMount() {
       
         /* 内部调用了draw函数 */
         this.initJson_parseLayout(this.initTxt_parseDiff());
+
+  this.initGUI()
 
 
   }
@@ -1086,8 +1157,11 @@ initJson_parseLayout(input){
               <svg id="svg-rv"></svg>
               <h3>{this.state.cluster}</h3>
         </div>
+        
+
         <button type="button" onClick={this.globalHandle} className="btn btn-outline-primary">Global View</button>
         <button type="button" onClick={this.filterHandle} className="btn btn-outline-primary">Filter</button>
+
 
         <div id='item-coat'>
             <div id="item" className='d-flex flex-column justify-content-between'>
@@ -1100,7 +1174,6 @@ initJson_parseLayout(input){
                           onClick={this.clickLabel.bind(this,d)}
                           >{d.label}</div>
                     })}
-                    {/* <div style={{backgroundColor:itemCardColor[1]}} className="item-card rounded alert-info" >123</div> */}
                 </div>
             </div>
         </div>
